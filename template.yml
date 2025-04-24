@@ -19,7 +19,7 @@ Resources:
             Effect: "Allow"
             Principal:
               AWS:
-                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+                - !Ref "AWS::AccountId"
             Action:
               - "SQS:*"
             Resource: !Ref Queue
