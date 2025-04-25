@@ -1,5 +1,8 @@
 # Lambda
+package.zip
 packages
+out
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
