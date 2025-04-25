@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Consume SQS messages with a Lambda Function with Execution Role
+
+Resources:
+  LambdaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+            - '-'
+            - - sqs-lambda
+              - !Ref AWS::AccountId
+              - !Ref AWS::Region
+              - 'bucket'
+              - !Select
+                - 0
+                - !Split
+                  - '-'
+                  - !Select
+                    - 2
+                    - !Split
+                      - /
+                      - !Ref AWS::StackId
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: sqs-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole
+
+  ReadSQSLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: read-sqs
+      Runtime: python3.13
+      Code:
+        S3Bucket: !Ref LambdaBucket       # <-- Your S3 bucket name
+        S3Key: lambda-code/package.zip  # <-- Path to your ZIP file
+      Handler: app.main.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+  Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: "Orders"
+      MessageRetentionPeriod: 86400 # 24 hours in seconds
+
+  QueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref Queue
+      PolicyDocument:
+        Statement:
+          -
+            Sid: __owner_statement
+            Effect: "Allow"
+            Principal:
+              AWS:
+                - !Ref "AWS::AccountId"
+            Action:
+              - "SQS:*"
+            Resource: !Ref Queue
+
+  LambdaEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      EventSourceArn: !GetAtt Queue.Arn
+      FunctionName: !GetAtt ReadSQSLambdaFunction.Arn
+      Enabled: true
+
+Outputs:
+  BucketName:
+    Description: "Name of the S3 bucket"
+    Value: !Ref LambdaBucket
