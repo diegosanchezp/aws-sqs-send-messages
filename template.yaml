@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Consume SQS messages with a Lambda Function with Execution Role
+
+Resources:
+  ReadSQSLambdaFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: app/
+      Handler: main.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      Policies:
+        - SQSPollerPolicy:
+            QueueName:
+              !GetAtt Queue.QueueName
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt Queue.Arn
+            BatchSize: 10
+            Enabled: true
+
+  Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: "Orders"
+      MessageRetentionPeriod: 86400 # 24 hours in seconds
+
+  QueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref Queue
+      PolicyDocument:
+        Statement:
+          -
+            Sid: __owner_statement
+            Effect: "Allow"
+            Principal:
+              AWS:
+                - !Ref "AWS::AccountId"
+            Action:
+              - "SQS:*"
+            Resource: !Ref Queue
